@@ -3,9 +3,10 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import ptBrLocale from '@fullcalendar/core/locales/pt-br'
-import { CalendarDays, MapPin, User, X } from 'lucide-react'
+import { Edit, MapPin, User, X } from 'lucide-react'
 import { DashboardLayout } from '../layouts/DashboardLayout'
 import { api } from '../services/api'
+import { CreateEventoModal } from '../components/CreateEventoModal'
 
 function getCorPorStatus(status) {
   switch (status) {
@@ -41,6 +42,8 @@ export function CalendarPage() {
   const [eventos, setEventos] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [eventoSelecionado, setEventoSelecionado] = useState(null)
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false)
+  const [eventoEmEdicao, setEventoEmEdicao] = useState(null)
 
   useEffect(() => {
     carregarEventos()
@@ -60,6 +63,7 @@ export function CalendarPage() {
         borderColor: getCorPorStatus(evento.status),
         textColor: '#ffffff',
         extendedProps: {
+          eventoOriginal: evento,
           status: evento.status,
           descricao: evento.descricao,
           local: evento.local,
@@ -77,6 +81,7 @@ export function CalendarPage() {
 
   function aoClicarEvento(info) {
     setEventoSelecionado({
+      eventoOriginal: info.event.extendedProps.eventoOriginal,
       titulo: info.event.title,
       status: info.event.extendedProps.status,
       descricao: info.event.extendedProps.descricao,
@@ -92,10 +97,21 @@ export function CalendarPage() {
     setEventoSelecionado(null)
   }
 
+  function abrirEdicao() {
+    setEventoEmEdicao(eventoSelecionado.eventoOriginal)
+    setModalEdicaoAberto(true)
+    setEventoSelecionado(null)
+  }
+
+  function fecharEdicao() {
+    setModalEdicaoAberto(false)
+    setEventoEmEdicao(null)
+  }
+
   return (
     <DashboardLayout titulo="Calendário Institucional">
       <div className="space-y-6">
-        
+
 
         <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -211,17 +227,31 @@ export function CalendarPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 onClick={fecharModal}
-                className="rounded-2xl bg-[#23415e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1c344c]"
+                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 Fechar
+              </button>
+
+              <button
+                onClick={abrirEdicao}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#23415e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1c344c]"
+              >
+                <Edit size={16} />
+                Editar
               </button>
             </div>
           </div>
         </div>
       )}
+      <CreateEventoModal
+        aberto={modalEdicaoAberto}
+        onClose={fecharEdicao}
+        onSuccess={carregarEventos}
+        eventoEmEdicao={eventoEmEdicao}
+      />
     </DashboardLayout>
   )
 }

@@ -2,19 +2,26 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../services/api'
 
-export function CreateEventoModal({ aberto, onClose, onSuccess }) {
+const formInicial = {
+  titulo: '',
+  descricao: '',
+  dataInicio: '',
+  horaInicio: '',
+  dataFim: '',
+  horaFim: '',
+  local: '',
+  exigeTransporte: false,
+  categoriaId: '',
+}
+
+export function CreateEventoModal({
+  aberto,
+  onClose,
+  onSuccess,
+  eventoEmEdicao = null,
+}) {
   const [categorias, setCategorias] = useState([])
-  const [form, setForm] = useState({
-    titulo: '',
-    descricao: '',
-    dataInicio: '',
-    horaInicio: '',
-    dataFim: '',
-    horaFim: '',
-    local: '',
-    exigeTransporte: false,
-    categoriaId: '',
-  })
+  const [form, setForm] = useState(formInicial)
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -28,6 +35,49 @@ export function CreateEventoModal({ aberto, onClose, onSuccess }) {
       document.body.style.overflow = 'auto'
     }
   }, [aberto])
+
+  useEffect(() => {
+    if (!aberto) return
+
+    if (eventoEmEdicao) {
+      const inicio = separarDataHora(eventoEmEdicao.dataInicio)
+      const fim = separarDataHora(eventoEmEdicao.dataFim)
+
+      setForm({
+        titulo: eventoEmEdicao.titulo || '',
+        descricao: eventoEmEdicao.descricao || '',
+        dataInicio: inicio.data,
+        horaInicio: inicio.hora,
+        dataFim: fim.data,
+        horaFim: fim.hora,
+        local: eventoEmEdicao.local || '',
+        exigeTransporte: eventoEmEdicao.exigeTransporte || false,
+        categoriaId:
+          eventoEmEdicao.categoriaId || eventoEmEdicao.categoria?.id || '',
+      })
+    } else {
+      setForm(formInicial)
+    }
+
+    setErro('')
+  }, [aberto, eventoEmEdicao])
+
+  function separarDataHora(valor) {
+    if (!valor) return { data: '', hora: '' }
+
+    const data = new Date(valor)
+
+    const ano = data.getFullYear()
+    const mes = String(data.getMonth() + 1).padStart(2, '0')
+    const dia = String(data.getDate()).padStart(2, '0')
+    const hora = String(data.getHours()).padStart(2, '0')
+    const minuto = String(data.getMinutes()).padStart(2, '0')
+
+    return {
+      data: `${ano}-${mes}-${dia}`,
+      hora: `${hora}:${minuto}`,
+    }
+  }
 
   async function carregarCategorias() {
     try {
@@ -68,7 +118,7 @@ export function CreateEventoModal({ aberto, onClose, onSuccess }) {
         return
       }
 
-      await api.post('/eventos', {
+      const payload = {
         titulo: form.titulo,
         descricao: form.descricao,
         dataInicio: dataInicioCompleta,
@@ -76,26 +126,25 @@ export function CreateEventoModal({ aberto, onClose, onSuccess }) {
         local: form.local,
         exigeTransporte: form.exigeTransporte,
         categoriaId: form.categoriaId,
-      })
+      }
 
-      setForm({
-        titulo: '',
-        descricao: '',
-        dataInicio: '',
-        horaInicio: '',
-        dataFim: '',
-        horaFim: '',
-        local: '',
-        exigeTransporte: false,
-        categoriaId: '',
-      })
+      if (eventoEmEdicao) {
+        await api.patch(`/eventos/${eventoEmEdicao.id}`, payload)
+      } else {
+        await api.post('/eventos', payload)
+      }
+
+      setForm(formInicial)
 
       onSuccess?.()
       onClose?.()
     } catch (error) {
       const mensagem = Array.isArray(error?.response?.data?.message)
         ? error.response.data.message.join(', ')
-        : error?.response?.data?.message || 'Não foi possível criar o evento.'
+        : error?.response?.data?.message ||
+        (eventoEmEdicao
+          ? 'Não foi possível editar o evento.'
+          : 'Não foi possível criar o evento.')
 
       setErro(mensagem)
     } finally {
@@ -112,13 +161,15 @@ export function CreateEventoModal({ aberto, onClose, onSuccess }) {
           <div className="mb-6 flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-sm font-medium text-[#35506b]">
-                Cadastro de evento
+                {eventoEmEdicao ? 'Edição de evento' : 'Cadastro de evento'}
               </p>
               <h3 className="mt-1 text-2xl font-bold text-slate-900">
-                Novo evento
+                {eventoEmEdicao ? 'Editar evento' : 'Novo evento'}
               </h3>
               <p className="mt-2 text-sm text-slate-500">
-                Preencha os dados para registrar um novo evento institucional.
+                {eventoEmEdicao
+                  ? 'Atualize os dados do evento institucional.'
+                  : 'Preencha os dados para registrar um novo evento institucional.'}
               </p>
             </div>
 
@@ -259,7 +310,11 @@ export function CreateEventoModal({ aberto, onClose, onSuccess }) {
                 disabled={carregando}
                 className="rounded-2xl bg-[#23415e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1c344c] disabled:opacity-70"
               >
-                {carregando ? 'Salvando...' : 'Salvar evento'}
+                {carregando
+                  ? 'Salvando...'
+                  : eventoEmEdicao
+                    ? 'Salvar alterações'
+                    : 'Salvar evento'}
               </button>
             </div>
           </form>
